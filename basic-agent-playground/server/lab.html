@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Agent Lab</title>
+  <style>
+    :root {
+      --bg: #0c0c0e;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --border: #2a2a35;
+      --text: #e2e2e8;
+      --muted: #5a5a70;
+      --accent: #7c5cbf;
+      --accent2: #a07de0;
+      --green: #4ade80;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --user-bubble: #1e2a1e;
+      --bot-bubble: #1a1a2e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 600; }
+    header .sub { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    /* ── Three-column layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr 280px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Parameter panels ── */
+    .params-area {
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title span { font-size: 13px; }
+
+    .field { margin-bottom: 11px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      font-size: 12px;
+    }
+    .field-desc {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .field-label .badge {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      color: var(--accent2);
+      background: rgba(160,125,224,0.12);
+      padding: 1px 6px;
+      border-radius: 4px;
+      min-width: 44px;
+      text-align: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 3px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--accent2);
+      cursor: pointer;
+      transition: background 0.1s, transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #c4a7ff;
+      transform: scale(1.2);
+    }
+
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+    textarea { resize: vertical; min-height: 65px; line-height: 1.4; }
+    select option { background: var(--surface2); }
+
+    /* ── Transcript panel ── */
+    .transcript-area {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .transcript-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .transcript-header button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.1s;
+    }
+    .transcript-header button:hover { color: var(--text); }
+    .transcript-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .transcript-empty {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      margin-top: 40px;
+    }
+    .bubble {
+      max-width: 90%;
+      padding: 8px 11px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .bubble.user {
+      background: var(--user-bubble);
+      border: 1px solid rgba(74,222,128,0.2);
+      align-self: flex-start;
+    }
+    .bubble.assistant {
+      background: var(--bot-bubble);
+      border: 1px solid rgba(160,125,224,0.2);
+      align-self: flex-end;
+    }
+    .bubble .role {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+    }
+    .bubble.user .role { color: var(--green); }
+    .bubble.assistant .role { color: var(--accent2); }
+
+    /* ── Right sidebar: controls ── */
+    .sidebar {
+      border-left: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .btn-connect {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-connect.idle   { background: var(--accent); color: #fff; }
+    .btn-connect.idle:hover { background: var(--accent2); }
+    .btn-connect.connecting { background: var(--surface2); color: var(--muted); cursor: not-allowed; }
+    .btn-connect.connected  { background: transparent; color: var(--red); border: 1px solid var(--red); }
+    .btn-connect.connected:hover { background: rgba(248,113,113,0.08); }
+
+    .status-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .status-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .dot.green  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .dot.yellow { background: var(--yellow); box-shadow: 0 0 5px var(--yellow); }
+    .dot.pulse  { animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+    .mic-label { font-size: 11px; color: var(--muted); }
+    .level-wrap { height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+    .level-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 3px;
+      transition: width 0.05s linear;
+    }
+
+    .log-area {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px;
+      font-size: 10px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--muted);
+      height: 140px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .log-line { line-height: 1.6; }
+    .log-line.info  { color: #93c5fd; }
+    .log-line.ok    { color: var(--green); }
+    .log-line.warn  { color: var(--yellow); }
+    .log-line.err   { color: var(--red); }
+
+    audio { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:18px">🎙</span>
+  <h1>Voice Agent Lab</h1>
+  <div class="sub">Adjust params → Connect → Talk</div>
+</header>
+
+<div class="layout">
+
+  <!-- Column 1: VAD + STT -->
+  <div class="params-area">
+
+    <div class="card">
+      <div class="card-title"><span>🔊</span> VAD — Silero</div>
+
+      <div class="field">
+        <div class="field-label">Confidence <span class="badge" id="v-conf-val">0.70</span></div>
+        <input type="range" id="v-conf" min="0.1" max="1.0" step="0.05" value="0.70"
+          oninput="badge('v-conf-val', this.value, 2)">
+        <div class="field-desc">Min Silero model score to count a frame as speech. Higher = only clear speech triggers detection.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Start seconds <span class="badge" id="v-start-val">0.20s</span></div>
+        <input type="range" id="v-start" min="0.0" max="2.0" step="0.05" value="0.20"
+          oninput="badge('v-start-val', this.value, 2, 's')">
+        <div class="field-desc">Consecutive speech frames required before "user started speaking" fires. Higher = debounce short noises.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Stop seconds <span class="badge" id="v-stop-val">0.20s</span></div>
+        <input type="range" id="v-stop" min="0.0" max="3.0" step="0.05" value="0.20"
+          oninput="badge('v-stop-val', this.value, 2, 's')">
+        <div class="field-desc">Silence required before VAD fires "stopped" event. Higher = tolerate longer pauses mid-sentence.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Min volume <span class="badge" id="v-mvol-val">0.60</span></div>
+        <input type="range" id="v-mvol" min="0.0" max="1.0" step="0.05" value="0.60"
+          oninput="badge('v-mvol-val', this.value, 2)">
+        <div class="field-desc">Raw audio volume gate. Frames below this are never "speech" regardless of Silero score.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Post-stop wait <span class="badge" id="v-psw-val">0.60s</span></div>
+        <input type="range" id="v-psw" min="0.0" max="3.0" step="0.1" value="0.60"
+          oninput="badge('v-psw-val', this.value, 2, 's')">
+        <div class="field-desc">After VAD fires "stopped", wait this long before sending to LLM. Prevents cut-off mid-thought.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>👂</span> STT — Deepgram</div>
+
+      <div class="field">
+        <div class="field-label">Model</div>
+        <select id="s-model">
+          <option value="nova-3-general" selected>nova-3-general</option>
+          <option value="nova-2-general">nova-2-general</option>
+          <option value="nova-3-medical">nova-3-medical</option>
+          <option value="enhanced-general">enhanced-general</option>
+          <option value="base">base</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Language</div>
+        <select id="s-lang">
+          <option value="en-US" selected>English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="zh">Chinese</option>
+          <option value="ko">Korean</option>
+        </select>
+      </div>
+    </div>
+
+  </div><!-- /col1 -->
+
+  <!-- Column 2: LLM + TTS + Transcript -->
+  <div class="params-area" style="border-left: 1px solid var(--border);">
+
+    <div class="card">
+      <div class="card-title"><span>🤖</span> LLM — OpenAI</div>
+
+      <div class="field">
+        <div class="field-label">Model</div>
+        <select id="l-model">
+          <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+          <option value="gpt-4o">gpt-4o</option>
+          <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+          <option value="gpt-4.1">gpt-4.1</option>
+          <option value="o4-mini">o4-mini</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Temperature <span class="badge" id="l-temp-val">1.00</span></div>
+        <input type="range" id="l-temp" min="0.0" max="2.0" step="0.05" value="1.0"
+          oninput="badge('l-temp-val', this.value, 2)">
+      </div>
+
+      <div class="field">
+        <div class="field-label">System prompt</div>
+        <textarea id="l-sys">You are a helpful assistant in a voice conversation. Your responses will be spoken aloud, so avoid emojis, bullet points, or other formatting that can't be spoken. Respond to what the user said in a creative, helpful, and brief way.</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🗣</span> TTS — Cartesia</div>
+
+      <div class="field">
+        <div class="field-label">Voice ID</div>
+        <input type="text" id="t-voice" value="e07c00bc-4134-4eae-9ea4-1a55fb45746b"
+          placeholder="Cartesia voice UUID">
+      </div>
+
+      <div class="field">
+        <div class="field-label">Speed <span class="badge" id="t-spd-val">1.00×</span></div>
+        <input type="range" id="t-spd" min="0.6" max="1.5" step="0.05" value="1.0"
+          oninput="badge('t-spd-val', this.value, 2, '×')">
+      </div>
+
+      <div class="field">
+        <div class="field-label">Volume <span class="badge" id="t-vol-val">1.00×</span></div>
+        <input type="range" id="t-vol" min="0.5" max="2.0" step="0.05" value="1.0"
+          oninput="badge('t-vol-val', this.value, 2, '×')">
+      </div>
+
+      <div class="field">
+        <div class="field-label">Emotion</div>
+        <select id="t-emo">
+          <option value="">— none —</option>
+          <option value="neutral">neutral</option>
+          <option value="happy">happy</option>
+          <option value="excited">excited</option>
+          <option value="content">content</option>
+          <option value="sad">sad</option>
+          <option value="angry">angry</option>
+          <option value="scared">scared</option>
+          <option value="curious">curious</option>
+        </select>
+      </div>
+    </div>
+
+  </div><!-- /col2 -->
+
+  <!-- Column 3: Transcript + Connection controls -->
+  <div style="display:flex; flex-direction:column; border-left: 1px solid var(--border); overflow:hidden;">
+
+    <!-- Transcript -->
+    <div class="transcript-area" style="flex:1; min-height:0;">
+      <div class="transcript-header">
+        Transcript
+        <button onclick="clearTranscript()">clear</button>
+      </div>
+      <div class="transcript-messages" id="transcriptMessages">
+        <div class="transcript-empty" id="transcriptEmpty">Transcript appears here after you connect and speak.</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="sidebar" style="flex-shrink:0; border-top: 1px solid var(--border); border-left:none;">
+      <button class="btn-connect idle" id="connectBtn" onclick="toggleConnect()">Connect</button>
+
+      <div class="status-block">
+        <div class="status-row">
+          <div class="dot" id="dot-conn"></div>
+          <span id="lbl-conn">Disconnected</span>
+        </div>
+        <div class="status-row">
+          <div class="dot" id="dot-mic"></div>
+          <span>Microphone</span>
+        </div>
+        <div>
+          <div class="mic-label">Input level</div>
+          <div class="level-wrap"><div class="level-fill" id="level-fill"></div></div>
+        </div>
+      </div>
+
+      <div class="log-area" id="logArea"></div>
+      <audio id="remoteAudio" autoplay playsinline></audio>
+    </div>
+
+  </div><!-- /col3 -->
+
+</div><!-- /layout -->
+
+<script>
+/* ── Helpers ── */
+function badge(id, val, dec, suf = '') {
+  document.getElementById(id).textContent = parseFloat(val).toFixed(dec) + suf;
+}
+function log(msg, type = 'info') {
+  const a = document.getElementById('logArea');
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  d.textContent = `[${new Date().toTimeString().slice(0,8)}] ${msg}`;
+  a.appendChild(d);
+  a.scrollTop = a.scrollHeight;
+}
+function setConnected(state) {
+  const btn = document.getElementById('connectBtn');
+  const dot = document.getElementById('dot-conn');
+  const lbl = document.getElementById('lbl-conn');
+  if (state === 'connected') {
+    btn.className = 'btn-connect connected'; btn.textContent = 'Disconnect';
+    dot.className = 'dot green'; lbl.textContent = 'Connected';
+  } else if (state === 'connecting') {
+    btn.className = 'btn-connect connecting'; btn.textContent = 'Connecting…';
+    dot.className = 'dot yellow pulse'; lbl.textContent = 'Connecting…';
+  } else {
+    btn.className = 'btn-connect idle'; btn.textContent = 'Connect';
+    dot.className = 'dot'; lbl.textContent = 'Disconnected';
+  }
+}
+
+/* ── Transcript ── */
+let lastEventTs = 0;
+let pollTimer = null;
+
+function clearTranscript() {
+  document.getElementById('transcriptMessages').innerHTML =
+    '<div class="transcript-empty" id="transcriptEmpty">Transcript appears here after you connect and speak.</div>';
+  lastEventTs = Date.now() / 1000; // skip past old events
+}
+
+function addBubble(role, text) {
+  const wrap = document.getElementById('transcriptMessages');
+  const empty = document.getElementById('transcriptEmpty');
+  if (empty) empty.remove();
+
+  const b = document.createElement('div');
+  b.className = `bubble ${role}`;
+  b.innerHTML = `<div class="role">${role === 'user' ? 'You' : 'Bot'}</div>${escHtml(text)}`;
+  wrap.appendChild(b);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function pollEvents() {
+  try {
+    const res = await fetch(`/api/events?since=${lastEventTs}`);
+    if (res.ok) {
+      const events = await res.json();
+      for (const ev of events) {
+        addBubble(ev.role, ev.text);
+        lastEventTs = Math.max(lastEventTs, ev.ts);
+      }
+    }
+  } catch (_) {}
+}
+
+function startPolling() {
+  lastEventTs = Date.now() / 1000;
+  pollTimer = setInterval(pollEvents, 800);
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* ── Read params ── */
+function getParams() {
+  return {
+    vad: {
+      confidence:          parseFloat(document.getElementById('v-conf').value),
+      start_secs:          parseFloat(document.getElementById('v-start').value),
+      stop_secs:           parseFloat(document.getElementById('v-stop').value),
+      min_volume:          parseFloat(document.getElementById('v-mvol').value),
+      user_speech_timeout: parseFloat(document.getElementById('v-psw').value),
+    },
+    llm: {
+      model:              document.getElementById('l-model').value,
+      temperature:        parseFloat(document.getElementById('l-temp').value),
+      system_instruction: document.getElementById('l-sys').value.trim(),
+    },
+    tts: {
+      voice_id: document.getElementById('t-voice').value.trim(),
+      speed:    parseFloat(document.getElementById('t-spd').value),
+      volume:   parseFloat(document.getElementById('t-vol').value),
+      emotion:  document.getElementById('t-emo').value || null,
+    },
+    stt: {
+      model:    document.getElementById('s-model').value,
+      language: document.getElementById('s-lang').value,
+    },
+  };
+}
+
+/* ── WebRTC ── */
+let pc = null, pcId = null, micStream = null;
+let audioCtx = null, analyser = null, rafId = null;
+
+async function toggleConnect() {
+  if (pc) doDisconnect(); else doConnect();
+}
+
+async function doConnect() {
+  setConnected('connecting');
+  try {
+    log('Requesting microphone…');
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    document.getElementById('dot-mic').className = 'dot green pulse';
+    startMicMeter(micStream);
+
+    log('Creating peer connection…');
+    pc = new RTCPeerConnection();
+    micStream.getAudioTracks().forEach(t => pc.addTrack(t, micStream));
+
+    pc.ontrack = ev => {
+      log('Bot audio received', 'ok');
+      document.getElementById('remoteAudio').srcObject = ev.streams[0];
+    };
+
+    pc.onconnectionstatechange = () => {
+      log(`WebRTC: ${pc.connectionState}`);
+      if (pc.connectionState === 'connected') {
+        setConnected('connected');
+        log('Agent ready — start talking!', 'ok');
+        startPolling();
+      } else if (['disconnected','failed','closed'].includes(pc.connectionState)) {
+        cleanupState();
+      }
+    };
+
+    pc.onicecandidate = async ev => {
+      if (ev.candidate && pcId) {
+        await fetch('/api/offer', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pc_id: pcId,
+            candidates: [{
+              candidate:       ev.candidate.candidate,
+              sdp_mid:         ev.candidate.sdpMid,
+              sdp_mline_index: ev.candidate.sdpMLineIndex,
+            }],
+          }),
+        }).catch(e => log('ICE error: ' + e, 'warn'));
+      }
+    };
+
+    log('Creating SDP offer…');
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') return resolve();
+      pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') resolve(); };
+      setTimeout(resolve, 3000);
+    });
+
+    log('Sending offer…');
+    const res = await fetch('/api/offer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sdp:          pc.localDescription.sdp,
+        type:         pc.localDescription.type,
+        request_data: getParams(),
+      }),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+
+    const answer = await res.json();
+    pcId = answer.pc_id;
+    log(`Answer (id: ${(pcId||'').slice(0,8)}…)`, 'ok');
+    await pc.setRemoteDescription(new RTCSessionDescription({ sdp: answer.sdp, type: answer.type }));
+
+  } catch (err) {
+    log('Error: ' + err.message, 'err');
+    cleanupState();
+  }
+}
+
+function doDisconnect() {
+  log('Disconnecting…');
+  cleanupState();
+}
+
+function cleanupState() {
+  stopPolling();
+  if (pc) { try { pc.close(); } catch(_){} pc = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; analyser = null; }
+  document.getElementById('remoteAudio').srcObject = null;
+  document.getElementById('dot-mic').className = 'dot';
+  document.getElementById('level-fill').style.width = '0%';
+  pcId = null;
+  setConnected('idle');
+}
+
+function startMicMeter(stream) {
+  audioCtx = new AudioContext();
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  src.connect(analyser);
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  function tick() {
+    analyser.getByteFrequencyData(buf);
+    const avg = buf.reduce((a,b) => a+b, 0) / buf.length;
+    document.getElementById('level-fill').style.width = Math.min(100, (avg/128)*220) + '%';
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
