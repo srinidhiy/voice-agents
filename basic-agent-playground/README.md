@@ -1,68 +1,80 @@
-# pipecat-quickstart
+# basic-agent-playground
 
-A Pipecat AI voice agent built with a cascade pipeline (STT → LLM → TTS).
+A Pipecat voice agent extended from the standard quickstart with a browser-based parameter playground for experimenting with VAD, LLM, TTS, and STT settings in real time.
 
-## Configuration
+## What's different from the Pipecat quickstart
 
-- **Bot Type**: Web
-- **Transport(s)**: SmallWebRTC, Daily (WebRTC)
-- **Pipeline**: Cascade
-  - **STT**: Deepgram
-  - **LLM**: OpenAI Responses
-  - **TTS**: Cartesia
+### 1. Parameter lab UI (`/lab`)
+
+The quickstart ships a minimal prebuilt WebRTC client at `/client`. This project adds a second route at `/lab` — a dark-themed control panel where you can tune every major pipeline parameter before (and between) sessions without touching any code.
+
+Parameters exposed:
+
+| Section | Controls |
+|---------|----------|
+| **VAD** | Confidence threshold, Start seconds, Stop seconds, Min volume, Post-stop wait |
+| **LLM** | Model, Temperature, System prompt |
+| **TTS** | Voice ID, Speed, Volume, Emotion |
+| **STT** | Model, Language |
+
+All values are sent as `request_data` in the WebRTC offer and read from `runner_args.body` when the bot starts, so each connection gets its own parameter snapshot.
+
+### 2. VAD-only turn detection
+
+The quickstart uses Pipecat's default turn strategies: `[VADUserTurnStartStrategy, TranscriptionUserTurnStartStrategy]`. The `TranscriptionUserTurnStartStrategy` fires as a fallback whenever Deepgram produces any transcript — which means a barely audible word can trigger the bot regardless of how strict the VAD sliders are set.
+
+This project replaces the default with:
+
+```python
+UserTurnStrategies(
+    start=[VADUserTurnStartStrategy()],
+    stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=N)],
+)
+```
+
+VAD is now the sole gatekeeper for turn start. The `confidence`, `start_secs`, and `min_volume` sliders produce observable effects.
+
+The stop strategy is also switched from the default ML-based `TurnAnalyzerUserTurnStopStrategy` to `SpeechTimeoutUserTurnStopStrategy`, which has a directly tunable `user_speech_timeout` (the "Post-stop wait" slider).
+
+### 3. Live transcript panel
+
+The quickstart has no transcript display. This project adds:
+
+- A `/api/events` endpoint that returns timestamped `{role, text}` events
+- Two lightweight `FrameProcessor` subclasses tapped into the pipeline:
+  - `UserTranscriptCapture` — placed between `stt` and `user_aggregator` to catch `TranscriptionFrame` before the aggregator consumes it
+  - `BotTranscriptCapture` — placed between `llm` and `tts` to accumulate `LLMTextFrame` chunks into complete turns
+- The lab UI polls `/api/events` every 800 ms while connected and renders a live conversation view
 
 ## Setup
 
-### Server
-
-1. **Navigate to server directory**:
-
-   ```bash
-   cd server
-   ```
-
-2. **Install dependencies**:
-
-   ```bash
-   uv sync
-   ```
-
-3. **Configure environment variables**:
-
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your API keys
-   ```
-
-4. **Run the bot**:
-
-   - SmallWebRTC: `uv run bot.py`
-   - Daily: `uv run bot.py --transport daily`
-
-## Project Structure
-
-```
-pipecat-quickstart/
-├── server/              # Python bot server
-│   ├── bot.py           # Main bot implementation
-│   ├── pyproject.toml   # Python dependencies
-│   ├── .env.example     # Environment variables template
-│   ├── .env             # Your API keys (git-ignored)
-│   ├── Dockerfile       # Container image for Pipecat Cloud
-│   └── pcc-deploy.toml  # Pipecat Cloud deployment config
-├── .gitignore           # Git ignore patterns
-└── README.md            # This file
+```bash
+cd server
+uv sync
+cp .env.example .env
+# Fill in DEEPGRAM_API_KEY, OPENAI_API_KEY, CARTESIA_API_KEY
+uv run bot.py
 ```
 
-## Deploying to Pipecat Cloud
+Then open `http://localhost:7860/lab` instead of `/client`.
 
-This project is configured for deployment to Pipecat Cloud. You can learn how to deploy to Pipecat Cloud in the [Pipecat Quickstart Guide](https://docs.pipecat.ai/getting-started/quickstart#step-2-deploy-to-production).
+## Project structure
 
-Refer to the [Pipecat Cloud Documentation](https://docs.pipecat.ai/deployment/pipecat-cloud/introduction) to learn more about configuring, deploying, and managing your agents in Pipecat Cloud.
+```
+basic-agent-playground/
+├── server/
+│   ├── bot.py           # Pipeline + lab routes + transcript capture
+│   ├── lab.html         # Parameter playground UI (self-contained)
+│   ├── pyproject.toml
+│   ├── .env.example
+│   ├── Dockerfile
+│   └── pcc-deploy.toml
+└── README.md
+```
 
-## Learn More
+## Learn more
 
-- [Pipecat Documentation](https://docs.pipecat.ai/)
+- [Pipecat documentation](https://docs.pipecat.ai/)
+- [VAD analyzer reference](https://docs.pipecat.ai/api-reference/audio/vad/silero)
+- [Turn strategies](https://docs.pipecat.ai/guides/turn-detection)
 - [Pipecat GitHub](https://github.com/pipecat-ai/pipecat)
-- [Pipecat Examples](https://github.com/pipecat-ai/pipecat-examples)
-- [Discord Community](https://discord.gg/pipecat)
