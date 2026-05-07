@@ -223,6 +223,23 @@
     .bubble.user .role { color: var(--green); }
     .bubble.assistant .role { color: var(--accent2); }
 
+    .metric-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .chip {
+      font-size: 10px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .chip.llm { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .chip.tts { background: rgba(96,165,250,0.12); color: #60a5fa; }
+    .chip.tok { background: rgba(160,125,224,0.12); color: var(--accent2); }
+
     /* ── Right sidebar: controls ── */
     .sidebar {
       border-left: 1px solid var(--border);
@@ -552,14 +569,24 @@ function clearTranscript() {
   lastEventTs = Date.now() / 1000; // skip past old events
 }
 
-function addBubble(role, text) {
+function addBubble(role, text, metrics) {
   const wrap = document.getElementById('transcriptMessages');
   const empty = document.getElementById('transcriptEmpty');
   if (empty) empty.remove();
 
   const b = document.createElement('div');
   b.className = `bubble ${role}`;
-  b.innerHTML = `<div class="role">${role === 'user' ? 'You' : 'Bot'}</div>${escHtml(text)}`;
+
+  let chipsHtml = '';
+  if (role === 'assistant' && metrics) {
+    const chips = [];
+    if (metrics.llm_ttfb != null) chips.push(`<span class="chip llm">LLM ${metrics.llm_ttfb}s</span>`);
+    if (metrics.tts_ttfb != null) chips.push(`<span class="chip tts">TTS ${metrics.tts_ttfb}s</span>`);
+    if (metrics.completion_tokens != null) chips.push(`<span class="chip tok">${metrics.completion_tokens} tok</span>`);
+    if (chips.length) chipsHtml = `<div class="metric-chips">${chips.join('')}</div>`;
+  }
+
+  b.innerHTML = `<div class="role">${role === 'user' ? 'You' : 'Bot'}</div>${escHtml(text)}${chipsHtml}`;
   wrap.appendChild(b);
   wrap.scrollTop = wrap.scrollHeight;
 }
@@ -574,7 +601,7 @@ async function pollEvents() {
     if (res.ok) {
       const events = await res.json();
       for (const ev of events) {
-        addBubble(ev.role, ev.text);
+        addBubble(ev.role, ev.text, ev.metrics);
         lastEventTs = Math.max(lastEventTs, ev.ts);
       }
     }

@@ -34,8 +34,10 @@ from pipecat.frames.frames import (
     LLMFullResponseStartFrame,
     LLMRunFrame,
     LLMTextFrame,
+    MetricsFrame,
     TranscriptionFrame,
 )
+from pipecat.metrics.metrics import LLMUsageMetricsData, TTFBMetricsData
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -78,6 +80,11 @@ _DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # Shared transcript event buffer — replaced on each new session.
 _events: deque = deque(maxlen=200)
 
+# Mutable metrics dict for the current in-flight bot turn.
+# Reset to a fresh dict on each LLMFullResponseStartFrame so that the previous
+# turn's event keeps its own reference while the new turn accumulates cleanly.
+_turn_metrics: dict = {}
+
 
 # ── Transcript capture processors ─────────────────────────────────────────────
 #
@@ -102,7 +109,7 @@ class UserTranscriptCapture(FrameProcessor):
 
 
 class BotTranscriptCapture(FrameProcessor):
-    """Captures LLM text output (placed between llm and tts)."""
+    """Captures LLM text output and LLM-side metrics (placed between llm and tts)."""
 
     def __init__(self, events: deque):
         super().__init__()
@@ -110,18 +117,41 @@ class BotTranscriptCapture(FrameProcessor):
         self._buf: list[str] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        global _turn_metrics
         await super().process_frame(frame, direction)
         if isinstance(frame, LLMFullResponseStartFrame):
             self._buf = []
+            _turn_metrics = {}
         elif isinstance(frame, LLMTextFrame):
             self._buf.append(frame.text)
+        elif isinstance(frame, MetricsFrame):
+            for m in frame.data:
+                if isinstance(m, TTFBMetricsData):
+                    _turn_metrics["llm_ttfb"] = round(m.value, 3)
+                elif isinstance(m, LLMUsageMetricsData):
+                    _turn_metrics["prompt_tokens"] = m.value.prompt_tokens
+                    _turn_metrics["completion_tokens"] = m.value.completion_tokens
         elif isinstance(frame, LLMFullResponseEndFrame) and self._buf:
             self._events.append({
                 "role": "assistant",
                 "text": "".join(self._buf),
                 "ts": time.time(),
+                "metrics": _turn_metrics,  # reference — TTS and late usage metrics update this dict
             })
             self._buf = []
+        await self.push_frame(frame, direction)
+
+
+class MetricsSink(FrameProcessor):
+    """Captures TTS-side MetricsFrame (placed at the end of the pipeline)."""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        global _turn_metrics
+        await super().process_frame(frame, direction)
+        if isinstance(frame, MetricsFrame):
+            for m in frame.data:
+                if isinstance(m, TTFBMetricsData) and "tts" in m.processor.lower():
+                    _turn_metrics["tts_ttfb"] = round(m.value, 3)
         await self.push_frame(frame, direction)
 
 
@@ -256,10 +286,11 @@ async def run_bot(transport: BaseTransport, params: dict | None = None):
         UserTranscriptCapture(_events),   # before aggregator consumes TranscriptionFrame
         user_aggregator,
         llm,
-        BotTranscriptCapture(_events),    # after LLM emits LLMTextFrame
+        BotTranscriptCapture(_events),    # after LLM emits LLMTextFrame/MetricsFrame
         tts,
         transport.output(),
         assistant_aggregator,
+        MetricsSink(),                    # catches TTS MetricsFrame after full pipeline
     ])
 
     task = PipelineTask(
