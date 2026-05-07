@@ -85,6 +85,10 @@ _events: deque = deque(maxlen=200)
 # turn's event keeps its own reference while the new turn accumulates cleanly.
 _turn_metrics: dict = {}
 
+# Timestamp of the most recent final STT transcript — used to compute dispatch
+# latency (gap between last user word and LLM being invoked).
+_last_transcript_ts: float = 0.0
+
 
 # ── Transcript capture processors ─────────────────────────────────────────────
 #
@@ -102,9 +106,11 @@ class UserTranscriptCapture(FrameProcessor):
         self._events = events
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        global _last_transcript_ts
         await super().process_frame(frame, direction)
         if isinstance(frame, TranscriptionFrame) and not isinstance(frame, InterimTranscriptionFrame):
-            self._events.append({"role": "user", "text": frame.text, "ts": time.time()})
+            _last_transcript_ts = time.time()
+            self._events.append({"role": "user", "text": frame.text, "ts": _last_transcript_ts})
         await self.push_frame(frame, direction)
 
 
@@ -117,11 +123,13 @@ class BotTranscriptCapture(FrameProcessor):
         self._buf: list[str] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
-        global _turn_metrics
+        global _turn_metrics, _last_transcript_ts
         await super().process_frame(frame, direction)
         if isinstance(frame, LLMFullResponseStartFrame):
             self._buf = []
             _turn_metrics = {}
+            if _last_transcript_ts:
+                _turn_metrics["dispatch"] = round(time.time() - _last_transcript_ts, 3)
         elif isinstance(frame, LLMTextFrame):
             self._buf.append(frame.text)
         elif isinstance(frame, MetricsFrame):

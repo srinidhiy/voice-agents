@@ -236,6 +236,7 @@
       border-radius: 4px;
       font-weight: 500;
     }
+    .chip.dispatch { background: rgba(52,211,153,0.12); color: #34d399; }
     .chip.llm { background: rgba(251,191,36,0.12); color: #fbbf24; }
     .chip.tts { background: rgba(96,165,250,0.12); color: #60a5fa; }
     .chip.tok { background: rgba(160,125,224,0.12); color: var(--accent2); }
@@ -562,11 +563,13 @@ function setConnected(state) {
 /* ── Transcript ── */
 let lastEventTs = 0;
 let pollTimer = null;
+let lastUserBubble = null; // used to merge consecutive user utterances
 
 function clearTranscript() {
   document.getElementById('transcriptMessages').innerHTML =
     '<div class="transcript-empty" id="transcriptEmpty">Transcript appears here after you connect and speak.</div>';
   lastEventTs = Date.now() / 1000; // skip past old events
+  lastUserBubble = null;
 }
 
 function addBubble(role, text, metrics) {
@@ -574,19 +577,35 @@ function addBubble(role, text, metrics) {
   const empty = document.getElementById('transcriptEmpty');
   if (empty) empty.remove();
 
+  // Merge consecutive user utterances (Deepgram finalizes on short pauses;
+  // the bot only responds once the full turn ends, so these belong together).
+  if (role === 'user' && lastUserBubble && wrap.lastElementChild === lastUserBubble) {
+    const span = lastUserBubble.querySelector('.bubble-text');
+    span.textContent += ' ' + text;
+    wrap.scrollTop = wrap.scrollHeight;
+    return;
+  }
+
   const b = document.createElement('div');
   b.className = `bubble ${role}`;
 
-  let chipsHtml = '';
-  if (role === 'assistant' && metrics) {
-    const chips = [];
-    if (metrics.llm_ttfb != null) chips.push(`<span class="chip llm">LLM ${metrics.llm_ttfb}s</span>`);
-    if (metrics.tts_ttfb != null) chips.push(`<span class="chip tts">TTS ${metrics.tts_ttfb}s</span>`);
-    if (metrics.completion_tokens != null) chips.push(`<span class="chip tok">${metrics.completion_tokens} tok</span>`);
-    if (chips.length) chipsHtml = `<div class="metric-chips">${chips.join('')}</div>`;
+  if (role === 'user') {
+    b.innerHTML = `<div class="role">You</div><span class="bubble-text">${escHtml(text)}</span>`;
+    lastUserBubble = b;
+  } else {
+    lastUserBubble = null;
+    let chipsHtml = '';
+    if (metrics) {
+      const chips = [];
+      if (metrics.dispatch != null)          chips.push(`<span class="chip dispatch">dispatch ${metrics.dispatch}s</span>`);
+      if (metrics.llm_ttfb != null)          chips.push(`<span class="chip llm">LLM ${metrics.llm_ttfb}s</span>`);
+      if (metrics.tts_ttfb != null)          chips.push(`<span class="chip tts">TTS ${metrics.tts_ttfb}s</span>`);
+      if (metrics.completion_tokens != null) chips.push(`<span class="chip tok">${metrics.completion_tokens} tok</span>`);
+      if (chips.length) chipsHtml = `<div class="metric-chips">${chips.join('')}</div>`;
+    }
+    b.innerHTML = `<div class="role">Bot</div><span class="bubble-text">${escHtml(text)}</span>${chipsHtml}`;
   }
 
-  b.innerHTML = `<div class="role">${role === 'user' ? 'You' : 'Bot'}</div>${escHtml(text)}${chipsHtml}`;
   wrap.appendChild(b);
   wrap.scrollTop = wrap.scrollHeight;
 }
