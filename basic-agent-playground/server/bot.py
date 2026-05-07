@@ -59,8 +59,9 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
-from pipecat.turns.user_start import VADUserTurnStartStrategy
-from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+from pipecat.turns.user_start import TranscriptionUserTurnStartStrategy, VADUserTurnStartStrategy
+from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy, TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 load_dotenv(override=True)
@@ -153,17 +154,30 @@ def _build_vad(cfg: dict) -> SileroVADAnalyzer:
 
 
 def _build_strategies(cfg: dict) -> UserTurnStrategies:
-    """Build turn strategies that use VAD exclusively for start detection.
+    """Build turn strategies.
 
-    Using only VADUserTurnStartStrategy (removing the TranscriptionUserTurnStartStrategy
-    fallback) ensures that confidence, start_secs, and min_volume sliders
-    actually gate whether speech triggers a response.
+    vad_strict=True  → VAD-only start (pipecat's TranscriptionUserTurnStartStrategy
+                        fallback removed). VAD params fully gate responses.
+                        Stop: SpeechTimeoutUserTurnStopStrategy (directly tunable).
+
+    vad_strict=False → Pipecat's default behaviour: VAD fires first, but
+                        TranscriptionUserTurnStartStrategy acts as a fallback so
+                        the bot responds even if VAD misses quiet speech.
+                        Stop: TurnAnalyzerUserTurnStopStrategy (smart ML model).
     """
+    strict = bool(cfg.get("vad_strict", False))
     speech_timeout = float(cfg.get("user_speech_timeout", 0.6))
-    return UserTurnStrategies(
-        start=[VADUserTurnStartStrategy()],
-        stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=speech_timeout)],
-    )
+
+    if strict:
+        return UserTurnStrategies(
+            start=[VADUserTurnStartStrategy()],
+            stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=speech_timeout)],
+        )
+    else:
+        return UserTurnStrategies(
+            start=[VADUserTurnStartStrategy(), TranscriptionUserTurnStartStrategy()],
+            stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())],
+        )
 
 
 def _build_stt(cfg: dict) -> DeepgramSTTService:

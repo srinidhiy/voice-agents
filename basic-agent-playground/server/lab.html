@@ -298,6 +298,11 @@
     .log-line.err   { color: var(--red); }
 
     audio { display: none; }
+
+    .strict-on {
+      background: rgba(160,125,224,0.2) !important;
+      color: var(--accent2) !important;
+    }
   </style>
 </head>
 <body>
@@ -345,10 +350,24 @@
       </div>
 
       <div class="field">
+        <div class="field-label" style="cursor:pointer;" onclick="toggleStrict()">
+          Strict mode
+          <span id="v-strict-badge" style="
+            font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px;
+            background:rgba(90,90,112,0.3); color:var(--muted); font-family:monospace;
+            transition: background 0.15s, color 0.15s;">OFF</span>
+        </div>
+        <input type="hidden" id="v-strict" value="false">
+        <div class="field-desc" id="v-strict-desc">
+          <b>OFF (pipecat default):</b> VAD fires first, but if it misses quiet speech Deepgram's transcript still triggers a response. Smart turn-end model decides when you're done.
+        </div>
+      </div>
+
+      <div id="v-psw-field" class="field" style="display:none;">
         <div class="field-label">Post-stop wait <span class="badge" id="v-psw-val">0.60s</span></div>
         <input type="range" id="v-psw" min="0.0" max="3.0" step="0.1" value="0.60"
           oninput="badge('v-psw-val', this.value, 2, 's')">
-        <div class="field-desc">After VAD fires "stopped", wait this long before sending to LLM. Prevents cut-off mid-thought.</div>
+        <div class="field-desc">After VAD fires "stopped", wait this long before sending to LLM. Only used in strict mode.</div>
       </div>
     </div>
 
@@ -570,6 +589,29 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
+/* ── Strict mode toggle ── */
+function toggleStrict() {
+  const hidden  = document.getElementById('v-strict');
+  const badge   = document.getElementById('v-strict-badge');
+  const desc    = document.getElementById('v-strict-desc');
+  const pswField = document.getElementById('v-psw-field');
+  const isOn = hidden.value === 'true';
+
+  if (isOn) {
+    hidden.value = 'false';
+    badge.textContent = 'OFF';
+    badge.classList.remove('strict-on');
+    desc.innerHTML = '<b>OFF (pipecat default):</b> VAD fires first, but if it misses quiet speech Deepgram\'s transcript still triggers a response. Smart turn-end model decides when you\'re done.';
+    pswField.style.display = 'none';
+  } else {
+    hidden.value = 'true';
+    badge.textContent = 'ON';
+    badge.classList.add('strict-on');
+    desc.innerHTML = '<b>ON (VAD-only):</b> Transcription fallback removed — VAD params fully gate responses. Post-stop wait replaces the smart turn-end model.';
+    pswField.style.display = 'block';
+  }
+}
+
 /* ── Read params ── */
 function getParams() {
   return {
@@ -578,6 +620,7 @@ function getParams() {
       start_secs:          parseFloat(document.getElementById('v-start').value),
       stop_secs:           parseFloat(document.getElementById('v-stop').value),
       min_volume:          parseFloat(document.getElementById('v-mvol').value),
+      vad_strict:          document.getElementById('v-strict').value === 'true',
       user_speech_timeout: parseFloat(document.getElementById('v-psw').value),
     },
     llm: {
