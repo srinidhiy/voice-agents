@@ -1,0 +1,12 @@
+# environment
+.env
+.env.local
+
+# JS
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

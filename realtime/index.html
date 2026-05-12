@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Realtime Voice Agent</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      max-width: 720px;
+      padding: 20px 24px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+
+    #status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    #status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #444;
+      transition: background 0.3s;
+    }
+
+    #status-dot.connecting { background: #f5a623; }
+    #status-dot.connected  { background: #4caf7d; }
+
+    #transcript {
+      flex: 1;
+      width: 100%;
+      max-width: 720px;
+      overflow-y: auto;
+      padding: 8px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #transcript:empty::after {
+      content: 'Press Start to begin a conversation.';
+      color: #444;
+      font-size: 0.875rem;
+      margin: auto;
+      text-align: center;
+    }
+
+    .turn {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-width: 85%;
+    }
+
+    .turn.user  { align-self: flex-end; align-items: flex-end; }
+    .turn.agent { align-self: flex-start; }
+
+    .turn-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #555;
+      padding: 0 4px;
+    }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .turn.user  .bubble {
+      background: #1a56db;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .turn.agent .bubble {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #2a2a2a;
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble.partial { opacity: 0.65; }
+
+    #speaking-bar {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 24px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    .wave {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .wave span {
+      display: block;
+      width: 3px;
+      border-radius: 2px;
+      background: #4caf7d;
+      animation: wave 0.8s ease-in-out infinite;
+    }
+
+    .wave span:nth-child(1) { height: 6px;  animation-delay: 0s; }
+    .wave span:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+    .wave span:nth-child(3) { height: 8px;  animation-delay: 0.2s; }
+    .wave span:nth-child(4) { height: 14px; animation-delay: 0.15s; }
+    .wave span:nth-child(5) { height: 6px;  animation-delay: 0.05s; }
+
+    @keyframes wave {
+      0%, 100% { transform: scaleY(1); }
+      50%       { transform: scaleY(0.4); }
+    }
+
+    footer {
+      width: 100%;
+      max-width: 720px;
+      padding: 16px 24px 28px;
+      display: flex;
+      justify-content: center;
+    }
+
+    #toggle-btn {
+      padding: 14px 48px;
+      border-radius: 40px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      background: #1a56db;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+
+    #toggle-btn:hover  { background: #1648c0; }
+    #toggle-btn:active { transform: scale(0.97); }
+    #toggle-btn.stop   { background: #c0392b; }
+    #toggle-btn.stop:hover { background: #a93226; }
+    #toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #error-msg {
+      color: #e74c3c;
+      font-size: 0.8rem;
+      padding: 4px 24px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Realtime Voice Agent</h1>
+    <div id="status-badge">
+      <div id="status-dot"></div>
+      <span id="status-text">Disconnected</span>
+    </div>
+  </header>
+
+  <div id="transcript"></div>
+
+  <div id="speaking-bar"></div>
+  <div id="error-msg"></div>
+
+  <footer>
+    <button id="toggle-btn">Start</button>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
