@@ -5,6 +5,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/session': 'http://localhost:3000',
+      '/search': 'http://localhost:3000',
     },
   },
   build: {

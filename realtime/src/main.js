@@ -1,4 +1,5 @@
 import { RealtimeAgent, RealtimeSession } from '@openai/agents/realtime';
+import { tool } from '@openai/agents';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const transcriptEl = document.getElementById('transcript');
@@ -9,10 +10,42 @@ const toggleBtn    = document.getElementById('toggle-btn');
 const errorMsg     = document.getElementById('error-msg');
 
 // ── Agent definition ──────────────────────────────────────────────────────────
+async function searchGoogle({ query }) {
+  try {
+    const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error searching Google:', error);
+    return "I couldn't find any information on that topic.";
+  }
+}
+
+const searchGoogleTool = tool({
+  name: 'search_google',
+  description:
+    'Search the web (Google via Serper). Call this whenever the user asks for current events, facts you are unsure about, news, prices, or anything that needs up-to-date information. Prefer this over guessing.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'The query to search for' },
+    },
+    required: ['query'],
+    additionalProperties: false,
+  },
+  execute: searchGoogle,
+});
+
+
 const agent = new RealtimeAgent({
   name: 'Assistant',
-  instructions: 'You are a helpful assistant. Be concise and friendly.',
-  voice: 'verse',
+  instructions:
+    'You are a helpful assistant. Be concise and friendly. For time-sensitive facts, current events, or anything you are not certain about, call search_google before answering. After you get results, summarize them briefly for the user.',
+  voice: 'marin',
+  tools: [searchGoogleTool],
 });
 
 // ── Session state ─────────────────────────────────────────────────────────────
@@ -99,6 +132,7 @@ async function startSession() {
       transport: 'webrtc',  // browser WebRTC — handles mic + audio output automatically
       model: 'gpt-realtime',
       config: {
+        toolChoice: 'auto',
         input_audio_transcription: { model: 'whisper-1' },
         turn_detection: { type: 'server_vad' },
       },
