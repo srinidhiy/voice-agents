@@ -88,8 +88,12 @@ async function startSession() {
       const { error } = await res.json();
       throw new Error(error || 'Failed to get session token');
     }
-    const { client_secret } = await res.json();
-    const ephemeralKey = client_secret.value;
+    const data = await res.json();
+    // API returns { value, expires_at, session, ... }; older docs used client_secret.value
+    const ephemeralKey = data.client_secret?.value ?? data.value;
+    if (!ephemeralKey) {
+      throw new Error('Invalid session response: no ephemeral key');
+    }
 
     session = new RealtimeSession(agent, {
       transport: 'webrtc',  // browser WebRTC — handles mic + audio output automatically
