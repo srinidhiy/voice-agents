@@ -81,12 +81,58 @@
     .turn.user  { align-self: flex-end; align-items: flex-end; }
     .turn.agent { align-self: flex-start; }
 
+    .turn-label-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 4px;
+    }
+
     .turn-label {
       font-size: 0.65rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: #555;
-      padding: 0 4px;
+    }
+
+    .latency-badge {
+      font-size: 0.6rem;
+      color: #4caf7d;
+      background: #0d1f14;
+      border: 1px solid #1a3a24;
+      padding: 1px 5px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .tool-row {
+      align-self: flex-start;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #161616;
+      border: 1px solid #222;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      color: #666;
+      max-width: 85%;
+    }
+
+    .tool-name {
+      color: #888;
+      font-weight: 500;
+    }
+
+    .tool-query {
+      color: #aaa;
+      font-style: italic;
+    }
+
+    .tool-duration {
+      color: #555;
+      margin-left: auto;
+      white-space: nowrap;
     }
 
     .bubble {
@@ -110,7 +156,6 @@
       border-bottom-left-radius: 4px;
     }
 
-    .bubble.partial { opacity: 0.65; }
 
     #speaking-bar {
       width: 100%;
@@ -176,6 +221,28 @@
     #toggle-btn.stop:hover { background: #a93226; }
     #toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    #stats-bar {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 28px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.7rem;
+      color: #444;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-value {
+      color: #666;
+    }
+
     #error-msg {
       color: #e74c3c;
       font-size: 0.8rem;
@@ -196,6 +263,7 @@
   <div id="transcript"></div>
 
   <div id="speaking-bar"></div>
+  <div id="stats-bar"></div>
   <div id="error-msg"></div>
 
   <footer>
