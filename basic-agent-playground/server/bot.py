@@ -22,6 +22,7 @@ import os
 import time
 from collections import deque
 
+import httpx
 from dotenv import load_dotenv
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
@@ -54,8 +55,11 @@ from pipecat.runner.types import (
     RunnerArguments,
     SmallWebRTCRunnerArguments,
 )
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.services.cartesia.tts import CartesiaTTSService, GenerationConfig
 from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.responses.llm import OpenAIResponsesLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
@@ -178,6 +182,40 @@ async def get_events(since: float = 0.0):
     return [e for e in _events if e["ts"] > since]
 
 
+# ── Search tool definition & handler ──────────────────────────────────────────
+
+_search_tools = ToolsSchema(standard_tools=[
+    FunctionSchema(
+        name="search_google",
+        description=(
+            "Search the web for current information. Use this for when the user asks for recent events, "
+            "news, prices, or anything you are not certain about. Prefer this over guessing."
+        ),
+        properties={"query": {"type": "string", "description": "The search query"}},
+        required=["query"],
+    )
+])
+
+
+async def _handle_search_google(params: FunctionCallParams) -> None:
+    query = params.arguments.get("query", "")
+    serper_key = os.getenv("SERPER_API_KEY")
+    if not serper_key:
+        await params.result_callback("Error: SERPER_API_KEY not set")
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                json={"q": query},
+            )
+            r.raise_for_status()
+            await params.result_callback(r.json())
+    except Exception as e:
+        logger.error(f"search_google tool error: {e}")
+        await params.result_callback(f"Search failed: {e}")
+
 # ── Service builders ───────────────────────────────────────────────────────────
 
 def _build_vad(cfg: dict) -> SileroVADAnalyzer:
@@ -261,7 +299,6 @@ def _build_llm(cfg: dict) -> OpenAIResponsesLLMService:
         ),
     )
 
-
 # ── Bot logic ──────────────────────────────────────────────────────────────────
 
 async def run_bot(transport: BaseTransport, params: dict | None = None):
@@ -276,10 +313,11 @@ async def run_bot(transport: BaseTransport, params: dict | None = None):
     stt = _build_stt(params.get("stt", {}))
     tts = _build_tts(params.get("tts", {}))
     llm = _build_llm(params.get("llm", {}))
+    llm.register_function("search_google", _handle_search_google)
 
     vad_cfg = params.get("vad", {})
 
-    context = LLMContext()
+    context = LLMContext(tools=_search_tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
